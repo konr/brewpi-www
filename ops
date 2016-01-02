@@ -1,0 +1,68 @@
+#!/bin/bash
+
+service="brewpi-www"
+registry="FIXME"
+sha=$(git rev-parse --short HEAD)
+image=$service
+remote="${registry}/${service}"
+dockerfile=Dockerfile
+
+run(){
+    docker run -p 80:80 -it brewpi-www:latest
+}
+
+build() {
+
+    echo "[BUILD] docker build -t "${image}:${sha}" -f $dockerfile ."
+    docker build -t "${image}:${sha}" -f $dockerfile .
+
+    docker_build_status=$?
+    if test $docker_build_status -ne 0; then
+        echo "#### FAILED: Build failed with a non-zero status (${docker_build_status})  ####"
+        exit $docker_build_status
+    fi
+    
+    echo "[TAG] docker tag -f ${image}:${sha} ${image}:latest"
+    docker tag -f ${image}:${sha} ${image}:latest
+    
+}
+
+submit() {
+
+    for target in ${sha} latest; do
+        
+        echo "[TAG] docker tag ${image}:${target} ${remote}:${target}"
+        docker tag ${image}:${target} ${remote}:${target}
+        echo "[PUSH] docker push ${remote}:${target}"
+        docker push ${remote}:${target}
+    
+        docker_push_status=$?
+        if test $docker_push_status -ne 0; then
+            echo "#### FAILED: Push failed with a non-zero status (${docker_build_status})  ####"
+            exit $docker_push_status
+        fi
+
+    done
+
+}
+
+run() {
+
+    docker run -it 
+
+}
+
+case "$1" in
+    run)
+        run
+        ;;
+    build)
+        build
+        ;;
+    submit)
+        submit
+        ;;
+    *)
+        echo "Syntax: $0 (build|submit|test)"
+    ;;
+esac
